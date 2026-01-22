@@ -253,22 +253,3 @@ customElements.define('my-component', MyComponent);
 - Safari 12.1+
 
 (Requires support for Custom Elements v1 and Shadow DOM)
-
-## Future Enhancements
-
-- [ ] User profile management
-- [ ] Advanced patient search and filtering
-- [ ] Data visualization (charts for vital signs trends)
-- [ ] Appointment scheduling
-- [ ] Medical records upload
-- [ ] Email notifications
-- [ ] Role-based access control (Admin, Doctor, Nurse)
-- [ ] Export patient data (PDF, CSV)
-
-## License
-
-This project is for educational purposes.
-
-## Support
-
-For issues or questions, please create an issue in the project repository.
