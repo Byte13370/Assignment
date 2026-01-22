@@ -4,6 +4,15 @@
 import { BaseComponent } from './base-component.js';
 import apiService from '../services/api-service.js';
 
+// Load validators dynamically
+let Validators;
+try {
+    const module = await import('../utils/validators.js');
+    Validators = module.default || window.Validators;
+} catch (e) {
+    console.warn('Validators module not loaded', e);
+}
+
 class VitalSigns extends BaseComponent {
     constructor() {
         super();
@@ -373,6 +382,16 @@ class VitalSigns extends BaseComponent {
         
         if (vitalForm) {
             vitalForm.addEventListener('submit', (e) => this.handleFormSubmit(e));
+            
+            // Clear field errors on input change
+            if (Validators) {
+                const inputs = vitalForm.querySelectorAll('input, textarea');
+                inputs.forEach(input => {
+                    input.addEventListener('input', () => {
+                        Validators.clearFieldError(input);
+                    });
+                });
+            }
         }
         
         if (cancelFormBtn) {
@@ -387,6 +406,12 @@ class VitalSigns extends BaseComponent {
         
         const { patientId } = this.getState();
         
+        // Clear previous errors
+        if (Validators) {
+            Validators.clearFormErrors(this.$('#vital-form'));
+        }
+        this.setState({ formError: null, formSuccess: null });
+        
         const vitalData = {
             blood_pressure_systolic: this.$('#bp-systolic').value ? parseInt(this.$('#bp-systolic').value) : null,
             blood_pressure_diastolic: this.$('#bp-diastolic').value ? parseInt(this.$('#bp-diastolic').value) : null,
@@ -396,6 +421,15 @@ class VitalSigns extends BaseComponent {
             oxygen_saturation: this.$('#oxygen-saturation').value ? parseFloat(this.$('#oxygen-saturation').value) : null,
             notes: this.$('#notes').value.trim()
         };
+        
+        // Client-side validation if validators are loaded
+        if (Validators) {
+            const validation = Validators.validateVitalSigns(vitalData);
+            if (!validation.valid) {
+                this.showVitalFieldErrors(validation.errors);
+                return;
+            }
+        }
         
         this.setState({ formLoading: true, formError: null, formSuccess: null });
         
@@ -411,10 +445,70 @@ class VitalSigns extends BaseComponent {
             // Reload patient data
             await this.loadPatientData();
         } else {
-            this.setState({ 
-                formLoading: false, 
-                formError: result.error || 'Failed to add vital signs'
-            });
+            // Handle validation errors from server
+            if (result.data && result.data.errors) {
+                this.showVitalFieldErrors(result.data.errors);
+            } else {
+                this.setState({ 
+                    formLoading: false, 
+                    formError: result.error || 'Failed to add vital signs'
+                });
+            }
+        }
+    }
+    
+    showVitalFieldErrors(errors) {
+        this.setState({ formLoading: false });
+        
+        // Clear any previous errors first
+        const vitalForm = this.$('#vital-form');
+        if (vitalForm && Validators) {
+            Validators.clearFormErrors(vitalForm);
+        }
+        
+        // Display errors next to fields
+        const fieldMap = {
+            'blood_pressure_systolic': 'bp-systolic',
+            'blood_pressure_diastolic': 'bp-diastolic',
+            'blood_pressure': 'bp-systolic', // Logical validation error - show on systolic field
+            'heart_rate': 'heart-rate',
+            'temperature': 'temperature',
+            'respiratory_rate': 'respiratory-rate',
+            'oxygen_saturation': 'oxygen-saturation',
+            'notes': 'notes'
+        };
+        
+        // Track which fields have errors
+        let errorCount = 0;
+        const errorMessages = [];
+        let generalError = null;
+        
+        for (const [fieldKey, errorMsg] of Object.entries(errors)) {
+            // Handle general form-level errors
+            if (fieldKey === 'general') {
+                generalError = errorMsg;
+                continue;
+            }
+            
+            errorMessages.push(errorMsg);
+            const inputId = fieldMap[fieldKey];
+            if (inputId) {
+                const inputElement = this.$(`#${inputId}`);
+                if (inputElement && Validators) {
+                    Validators.showFieldError(inputElement, errorMsg);
+                    errorCount++;
+                }
+            }
+        }
+        
+        // Show general error message at the top
+        if (generalError) {
+            this.setState({ formError: generalError });
+        } else if (errorCount > 0) {
+            const errorSummary = errorCount === 1 
+                ? 'Please fix the validation error below.' 
+                : `Please fix the ${errorCount} validation errors below.`;
+            this.setState({ formError: errorSummary });
         }
     }
 }

@@ -5,6 +5,15 @@ import { BaseComponent } from './base-component.js';
 import apiService from '../services/api-service.js';
 import router from '../router.js';
 
+// Load validators dynamically
+let Validators;
+try {
+    const module = await import('../utils/validators.js');
+    Validators = module.default || window.Validators;
+} catch (e) {
+    console.warn('Validators module not loaded', e);
+}
+
 class LoginComponent extends BaseComponent {
     constructor() {
         super();
@@ -179,13 +188,29 @@ class LoginComponent extends BaseComponent {
             return;
         }
         
-        if (password !== confirmPassword) {
-            this.setState({ error: 'Passwords do not match' });
-            return;
+        // Use validators if available
+        if (Validators) {
+            const usernameValidation = Validators.validateUsername(username);
+            if (!usernameValidation.valid) {
+                this.setState({ error: usernameValidation.error });
+                return;
+            }
+            
+            const emailValidation = Validators.validateEmail(email, true);
+            if (!emailValidation.valid) {
+                this.setState({ error: emailValidation.error });
+                return;
+            }
+            
+            const passwordValidation = Validators.validatePassword(password);
+            if (!passwordValidation.valid) {
+                this.setState({ error: passwordValidation.error });
+                return;
+            }
         }
         
-        if (password.length < 6) {
-            this.setState({ error: 'Password must be at least 6 characters' });
+        if (password !== confirmPassword) {
+            this.setState({ error: 'Passwords do not match' });
             return;
         }
         
@@ -197,10 +222,20 @@ class LoginComponent extends BaseComponent {
             // Auto-login after registration
             await this.handleLogin(username, password);
         } else {
-            this.setState({ 
-                loading: false, 
-                error: result.error || 'Registration failed'
-            });
+            // Handle validation errors from server
+            if (result.data && result.data.errors) {
+                const errors = result.data.errors;
+                const errorMessages = Object.values(errors).join(', ');
+                this.setState({ 
+                    loading: false, 
+                    error: errorMessages
+                });
+            } else {
+                this.setState({ 
+                    loading: false, 
+                    error: result.error || 'Registration failed'
+                });
+            }
         }
     }
 }

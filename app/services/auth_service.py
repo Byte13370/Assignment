@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from flask import current_app
 from app.models.user import User
 from app import db_session
+from app.services.validators import Validator
 
 class AuthService:
     """Authentication Service - Business Logic Layer"""
@@ -80,15 +81,29 @@ class AuthService:
         Returns: (success: bool, user_dict or error_message: str)
         """
         try:
+            # Validate user registration data
+            user_data = {
+                'username': username,
+                'email': email,
+                'password': password
+            }
+            is_valid, errors = Validator.validate_user_registration(user_data)
+            if not is_valid:
+                return False, errors
+            
+            # Sanitize inputs
+            username = username.strip()
+            email = email.strip().lower()
+            
             # Check if username already exists
             existing_user = db_session.query(User).filter_by(username=username).first()
             if existing_user:
-                return False, "Username already exists"
+                return False, {"username": "Username already exists"}
             
             # Check if email already exists
             existing_email = db_session.query(User).filter_by(email=email).first()
             if existing_email:
-                return False, "Email already registered"
+                return False, {"email": "Email already registered"}
             
             # Create new user
             user = User(username=username, email=email)

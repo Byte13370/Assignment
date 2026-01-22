@@ -59,7 +59,11 @@ def register():
                 'user': result
             }), 201
         else:
-            return jsonify({'error': result}), 400
+            # Check if result is a dict of field errors or a single error message
+            if isinstance(result, dict):
+                return jsonify({'errors': result}), 400
+            else:
+                return jsonify({'error': result}), 400
     
     except Exception as e:
         return jsonify({'error': f'Server error: {str(e)}'}), 500

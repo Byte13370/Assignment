@@ -247,6 +247,26 @@ export class BaseComponent extends HTMLElement {
                     border-color: #2563eb;
                     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
                 }
+                
+                .form-group input.is-invalid,
+                .form-group select.is-invalid,
+                .form-group textarea.is-invalid {
+                    border-color: #dc3545;
+                }
+                
+                .form-group input.is-invalid:focus,
+                .form-group select.is-invalid:focus,
+                .form-group textarea.is-invalid:focus {
+                    border-color: #dc3545;
+                    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+                }
+                
+                .invalid-feedback {
+                    color: #dc3545;
+                    font-size: 0.875rem;
+                    margin-top: 0.25rem;
+                    display: block;
+                }
             </style>
         `;
     }

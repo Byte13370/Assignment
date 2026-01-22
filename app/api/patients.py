@@ -26,7 +26,11 @@ def create_patient(user_id):
                 'patient': result
             }), 201
         else:
-            return jsonify({'error': result}), 400
+            # Check if result is a dict of field errors or a single error message
+            if isinstance(result, dict):
+                return jsonify({'errors': result}), 400
+            else:
+                return jsonify({'error': result}), 400
     
     except Exception as e:
         return jsonify({'error': f'Server error: {str(e)}'}), 500
@@ -90,7 +94,11 @@ def update_patient(user_id, patient_id):
                 'patient': result
             }), 200
         else:
-            return jsonify({'error': result}), 400
+            # Check if result is a dict of field errors or a single error message
+            if isinstance(result, dict):
+                return jsonify({'errors': result}), 400
+            else:
+                return jsonify({'error': result}), 400
     
     except Exception as e:
         return jsonify({'error': f'Server error: {str(e)}'}), 500
@@ -117,7 +125,11 @@ def add_vital_signs(user_id, patient_id):
                 'vital': result
             }), 201
         else:
-            return jsonify({'error': result}), 400
+            # Check if result is a dict of field errors or a single error message
+            if isinstance(result, dict):
+                return jsonify({'errors': result}), 400
+            else:
+                return jsonify({'error': result}), 400
     
     except Exception as e:
         return jsonify({'error': f'Server error: {str(e)}'}), 500

@@ -4,13 +4,23 @@
 import { BaseComponent } from './base-component.js';
 import apiService from '../services/api-service.js';
 
+// Load validators dynamically
+let Validators;
+try {
+    const module = await import('../utils/validators.js');
+    Validators = module.default || window.Validators;
+} catch (e) {
+    console.warn('Validators module not loaded', e);
+}
+
 class PatientForm extends BaseComponent {
     constructor() {
         super();
         this.setState({
             loading: false,
             error: null,
-            success: null
+            success: null,
+            fieldErrors: {}
         });
     }
     
@@ -155,6 +165,18 @@ class PatientForm extends BaseComponent {
             medical_history: this.$('#medical-history').value.trim()
         };
         
+        // Clear previous errors
+        this.clearFieldErrors();
+        
+        // Client-side validation if validators are loaded
+        if (Validators) {
+            const validation = Validators.validatePatientData(patientData);
+            if (!validation.valid) {
+                this.showFieldErrors(validation.errors);
+                return;
+            }
+        }
+        
         this.setState({ loading: true, error: null, success: null });
         
         const result = await apiService.createPatient(patientData);
@@ -174,11 +196,53 @@ class PatientForm extends BaseComponent {
                 this.setState({ success: null });
             }, 2000);
         } else {
-            this.setState({ 
-                loading: false, 
-                error: result.error || 'Failed to add patient'
-            });
+            // Handle validation errors from server
+            if (result.data && result.data.errors) {
+                this.showFieldErrors(result.data.errors);
+            } else {
+                this.setState({ 
+                    loading: false, 
+                    error: result.error || 'Failed to add patient'
+                });
+            }
         }
+    }
+    
+    clearFieldErrors() {
+        const form = this.$('#patient-form');
+        if (form && Validators) {
+            Validators.clearFormErrors(form);
+        }
+    }
+    
+    showFieldErrors(errors) {
+        this.setState({ loading: false });
+        
+        // Display errors next to fields
+        const fieldMap = {
+            'first_name': 'first-name',
+            'last_name': 'last-name',
+            'date_of_birth': 'dob',
+            'gender': 'gender',
+            'phone': 'phone',
+            'email': 'email',
+            'address': 'address',
+            'medical_history': 'medical-history'
+        };
+        
+        for (const [fieldKey, errorMsg] of Object.entries(errors)) {
+            const inputId = fieldMap[fieldKey];
+            if (inputId) {
+                const inputElement = this.$(`#${inputId}`);
+                if (inputElement && Validators) {
+                    Validators.showFieldError(inputElement, errorMsg);
+                }
+            }
+        }
+        
+        // Also show general error message
+        const errorMessage = Object.values(errors).join(', ');
+        this.setState({ error: `Validation errors: ${errorMessage}` });
     }
 }
 

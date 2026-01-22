@@ -81,6 +81,14 @@ class ApiService {
             const data = await response.json();
             
             if (!response.ok) {
+                // Return validation errors if present
+                if (response.status === 400 && data.errors) {
+                    return { 
+                        success: false, 
+                        error: data.error || 'Validation failed',
+                        data: { errors: data.errors }
+                    };
+                }
                 throw new Error(data.error || `HTTP ${response.status}`);
             }
             

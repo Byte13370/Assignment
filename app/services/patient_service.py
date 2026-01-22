@@ -1,6 +1,7 @@
 from datetime import datetime
 from app.models.patient import Patient
 from app import db_session
+from app.services.validators import Validator
 
 class PatientService:
     """Patient Service - Business Logic Layer"""
@@ -12,22 +13,34 @@ class PatientService:
         Returns: (success: bool, patient_dict or error_message: str)
         """
         try:
-            # Validate required fields
-            required_fields = ['first_name', 'last_name', 'date_of_birth', 'gender']
-            for field in required_fields:
-                if field not in patient_data or not patient_data[field]:
-                    return False, f"Missing required field: {field}"
+            # Validate all patient data
+            is_valid, errors = Validator.validate_patient_data(patient_data)
+            if not is_valid:
+                # Return first error or all errors as a dict
+                return False, errors
+            
+            # Sanitize text fields to prevent XSS
+            sanitized_data = {
+                'first_name': patient_data['first_name'].strip(),
+                'last_name': patient_data['last_name'].strip(),
+                'date_of_birth': patient_data['date_of_birth'].strip(),
+                'gender': patient_data['gender'].strip(),
+                'phone': patient_data.get('phone', '').strip() if patient_data.get('phone') else None,
+                'email': patient_data.get('email', '').strip() if patient_data.get('email') else None,
+                'address': Validator.sanitize_text(patient_data.get('address')) if patient_data.get('address') else None,
+                'medical_history': Validator.sanitize_text(patient_data.get('medical_history')) if patient_data.get('medical_history') else None
+            }
             
             # Create patient
             patient = Patient(
-                first_name=patient_data['first_name'],
-                last_name=patient_data['last_name'],
-                date_of_birth=patient_data['date_of_birth'],
-                gender=patient_data['gender'],
-                phone=patient_data.get('phone'),
-                email=patient_data.get('email'),
-                address=patient_data.get('address'),
-                medical_history=patient_data.get('medical_history')
+                first_name=sanitized_data['first_name'],
+                last_name=sanitized_data['last_name'],
+                date_of_birth=sanitized_data['date_of_birth'],
+                gender=sanitized_data['gender'],
+                phone=sanitized_data['phone'],
+                email=sanitized_data['email'],
+                address=sanitized_data['address'],
+                medical_history=sanitized_data['medical_history']
             )
             
             db_session.add(patient)
@@ -75,12 +88,23 @@ class PatientService:
             if not patient:
                 return False, "Patient not found"
             
-            # Update fields
+            # Validate all patient data
+            is_valid, errors = Validator.validate_patient_data(patient_data)
+            if not is_valid:
+                return False, errors
+            
+            # Sanitize and update fields
             updateable_fields = ['first_name', 'last_name', 'date_of_birth', 'gender', 
                                'phone', 'email', 'address', 'medical_history']
             for field in updateable_fields:
                 if field in patient_data:
-                    setattr(patient, field, patient_data[field])
+                    value = patient_data[field]
+                    # Sanitize text fields
+                    if field in ['address', 'medical_history'] and value:
+                        value = Validator.sanitize_text(value)
+                    elif isinstance(value, str) and value:
+                        value = value.strip()
+                    setattr(patient, field, value)
             
             patient.updated_at = datetime.utcnow()
             db_session.commit()

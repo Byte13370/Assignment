@@ -2,6 +2,7 @@ from datetime import datetime
 from app.models.vital import Vital
 from app.models.patient import Patient
 from app import db_session
+from app.services.validators import Validator
 
 class VitalService:
     """Vital Signs Service - Business Logic Layer"""
@@ -18,6 +19,16 @@ class VitalService:
             if not patient:
                 return False, "Patient not found"
             
+            # Validate vital signs data
+            is_valid, errors = Validator.validate_vital_data(vital_data)
+            if not is_valid:
+                return False, errors
+            
+            # Sanitize notes field
+            notes = vital_data.get('notes')
+            if notes:
+                notes = Validator.sanitize_text(notes)
+            
             # Create vital record
             vital = Vital(
                 patient_id=patient_id,
@@ -27,7 +38,7 @@ class VitalService:
                 temperature=vital_data.get('temperature'),
                 respiratory_rate=vital_data.get('respiratory_rate'),
                 oxygen_saturation=vital_data.get('oxygen_saturation'),
-                notes=vital_data.get('notes')
+                notes=notes
             )
             
             db_session.add(vital)
