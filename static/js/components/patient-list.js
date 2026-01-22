@@ -13,7 +13,15 @@ class PatientList extends BaseComponent {
             loading: true,
             error: null,
             searchTerm: '',
-            selectedPatient: null
+            selectedPatient: null,
+            pagination: {
+                page: 1,
+                per_page: 10,
+                total: 0,
+                pages: 0,
+                has_next: false,
+                has_prev: false
+            }
         });
     }
     
@@ -22,16 +30,27 @@ class PatientList extends BaseComponent {
         await this.loadPatients();
     }
     
-    async loadPatients() {
+    async loadPatients(page = 1) {
         this.setState({ loading: true, error: null });
         
-        const result = await apiService.getPatients();
+        const { searchTerm, pagination } = this.getState();
+        const params = {
+            page,
+            per_page: pagination.per_page
+        };
+        
+        if (searchTerm) {
+            params.search = searchTerm;
+        }
+        
+        const result = await apiService.getPatients(params);
         
         if (result.success) {
-            const patients = result.data.patients || [];
+            const data = result.data;
             this.setState({
-                patients,
-                filteredPatients: patients,
+                patients: data.patients || [],
+                filteredPatients: data.patients || [],
+                pagination: data.pagination || pagination,
                 loading: false
             });
         } else {
@@ -42,26 +61,13 @@ class PatientList extends BaseComponent {
         }
     }
     
-    filterPatients(searchTerm) {
-        const { patients } = this.getState();
-        
-        if (!searchTerm) {
-            this.setState({ filteredPatients: patients, searchTerm: '' });
-            return;
-        }
-        
-        const term = searchTerm.toLowerCase();
-        const filtered = patients.filter(patient => 
-            patient.first_name.toLowerCase().includes(term) ||
-            patient.last_name.toLowerCase().includes(term) ||
-            patient.email?.toLowerCase().includes(term)
-        );
-        
-        this.setState({ filteredPatients: filtered, searchTerm });
+    async filterPatients(searchTerm) {
+        this.setState({ searchTerm });
+        await this.loadPatients(1); // Reset to first page when searching
     }
     
     render() {
-        const { filteredPatients, loading, error, searchTerm } = this.getState();
+        const { filteredPatients, loading, error, searchTerm, pagination } = this.getState();
         
         this.shadowRoot.innerHTML = `
             ${this.getCommonStyles()}
@@ -139,11 +145,55 @@ class PatientList extends BaseComponent {
                     padding: 3rem;
                     color: #6b7280;
                 }
+                
+                .pagination {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-top: 1.5rem;
+                    padding-top: 1rem;
+                    border-top: 1px solid #e5e7eb;
+                }
+                
+                .pagination-info {
+                    color: #6b7280;
+                    font-size: 0.875rem;
+                }
+                
+                .pagination-controls {
+                    display: flex;
+                    gap: 0.5rem;
+                    align-items: center;
+                }
+                
+                .pagination-controls button {
+                    padding: 0.5rem 1rem;
+                    border: 1px solid #d1d5db;
+                    background: white;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 0.875rem;
+                }
+                
+                .pagination-controls button:hover:not(:disabled) {
+                    background-color: #f9fafb;
+                }
+                
+                .pagination-controls button:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+                
+                .pagination-controls .page-info {
+                    padding: 0.5rem 1rem;
+                    font-weight: 600;
+                    color: #374151;
+                }
             </style>
             
             <div class="list-container">
                 <div class="list-header">
-                    <h3>Patients (${filteredPatients.length})</h3>
+                    <h3>Patients (${pagination.total})</h3>
                     <div class="search-box">
                         <input 
                             type="text" 
@@ -193,6 +243,19 @@ class PatientList extends BaseComponent {
                             `).join('')}
                         </tbody>
                     </table>
+                    
+                    ${pagination.pages > 1 ? `
+                        <div class="pagination">
+                            <div class="pagination-info">
+                                Showing ${((pagination.page - 1) * pagination.per_page) + 1} to ${Math.min(pagination.page * pagination.per_page, pagination.total)} of ${pagination.total}
+                            </div>
+                            <div class="pagination-controls">
+                                <button id="prev-btn" ${!pagination.has_prev ? 'disabled' : ''}>Previous</button>
+                                <span class="page-info">Page ${pagination.page} of ${pagination.pages}</span>
+                                <button id="next-btn" ${!pagination.has_next ? 'disabled' : ''}>Next</button>
+                            </div>
+                        </div>
+                    ` : ''}
                 ` : ''}
             </div>
         `;
@@ -201,10 +264,30 @@ class PatientList extends BaseComponent {
     attachEventListeners() {
         const searchInput = this.$('#search-input');
         const vitalsBtns = this.$$('.view-vitals-btn');
+        const prevBtn = this.$('#prev-btn');
+        const nextBtn = this.$('#next-btn');
         
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 this.filterPatients(e.target.value);
+            });
+        }
+        
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                const { pagination } = this.getState();
+                if (pagination.has_prev) {
+                    this.loadPatients(pagination.page - 1);
+                }
+            });
+        }
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                const { pagination } = this.getState();
+                if (pagination.has_next) {
+                    this.loadPatients(pagination.page + 1);
+                }
             });
         }
         

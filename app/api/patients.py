@@ -40,19 +40,34 @@ def create_patient(user_id):
 @token_required
 def get_patients(user_id):
     """
-    Get all patients or search by name
-    Query params: ?search=<name>
+    Get all patients or search by name with pagination
+    Query params: ?search=<name>&page=<num>&per_page=<num>
     """
     try:
         search_term = request.args.get('search', '').strip()
         
+        # Get pagination parameters with validation
+        try:
+            page = int(request.args.get('page', 1))
+            per_page = int(request.args.get('per_page', 10))
+            
+            # Validate parameters
+            if page < 1:
+                return jsonify({'error': 'Page must be >= 1'}), 400
+            if per_page < 1 or per_page > 100:
+                return jsonify({'error': 'Per page must be between 1 and 100'}), 400
+                
+        except ValueError:
+            return jsonify({'error': 'Invalid pagination parameters'}), 400
+        
+        # Call service with pagination
         if search_term:
-            success, result = PatientService.search_patients(search_term)
+            success, result = PatientService.search_patients(search_term, page, per_page)
         else:
-            success, result = PatientService.get_all_patients()
+            success, result = PatientService.get_all_patients(page, per_page)
         
         if success:
-            return jsonify({'patients': result}), 200
+            return jsonify(result), 200
         else:
             return jsonify({'error': result}), 400
     

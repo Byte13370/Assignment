@@ -160,10 +160,24 @@ class ApiService {
     }
     
     /**
-     * Get all patients
+     * Get all patients with pagination
+     * @param {Object} params - Query parameters {search, page, per_page}
      */
-    async getPatients(searchTerm = '') {
-        const endpoint = searchTerm ? `/patients?search=${encodeURIComponent(searchTerm)}` : '/patients';
+    async getPatients(params = {}) {
+        const queryParams = new URLSearchParams();
+        
+        if (params.search) {
+            queryParams.append('search', params.search);
+        }
+        if (params.page) {
+            queryParams.append('page', params.page);
+        }
+        if (params.per_page) {
+            queryParams.append('per_page', params.per_page);
+        }
+        
+        const queryString = queryParams.toString();
+        const endpoint = queryString ? `/patients?${queryString}` : '/patients';
         return this.get(endpoint);
     }
     

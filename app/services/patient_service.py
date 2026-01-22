@@ -52,14 +52,32 @@ class PatientService:
             return False, f"Error creating patient: {str(e)}"
     
     @staticmethod
-    def get_all_patients():
+    def get_all_patients(page=1, per_page=10):
         """
-        Get all patients
-        Returns: (success: bool, list of patient_dicts or error_message: str)
+        Get all patients with pagination
+        Args:
+            page: Page number (default: 1)
+            per_page: Number of results per page (default: 10)
+        Returns: (success: bool, dict with patients and pagination or error_message: str)
         """
         try:
-            patients = db_session.query(Patient).order_by(Patient.created_at.desc()).all()
-            return True, [patient.to_dict() for patient in patients]
+            # Build base query
+            query = db_session.query(Patient).order_by(Patient.created_at.desc())
+            
+            # Get total count
+            total = query.count()
+            
+            # Apply pagination
+            offset = (page - 1) * per_page
+            patients = query.limit(per_page).offset(offset).all()
+            
+            # Build response with pagination metadata
+            result = {
+                'patients': [patient.to_dict() for patient in patients],
+                'pagination': PatientService._build_pagination_metadata(page, per_page, total)
+            }
+            
+            return True, result
         except Exception as e:
             return False, f"Error fetching patients: {str(e)}"
     
@@ -115,18 +133,59 @@ class PatientService:
             return False, f"Error updating patient: {str(e)}"
     
     @staticmethod
-    def search_patients(search_term):
+    def search_patients(search_term, page=1, per_page=10):
         """
-        Search patients by name
-        Returns: (success: bool, list of patient_dicts or error_message: str)
+        Search patients by name with pagination
+        Args:
+            search_term: Search query for first/last name
+            page: Page number (default: 1)
+            per_page: Number of results per page (default: 10)
+        Returns: (success: bool, dict with patients and pagination or error_message: str)
         """
         try:
             search_pattern = f"%{search_term}%"
-            patients = db_session.query(Patient).filter(
+            
+            # Build base query
+            query = db_session.query(Patient).filter(
                 (Patient.first_name.ilike(search_pattern)) |
                 (Patient.last_name.ilike(search_pattern))
-            ).all()
+            ).order_by(Patient.created_at.desc())
             
-            return True, [patient.to_dict() for patient in patients]
+            # Get total count
+            total = query.count()
+            
+            # Apply pagination
+            offset = (page - 1) * per_page
+            patients = query.limit(per_page).offset(offset).all()
+            
+            # Build response with pagination metadata
+            result = {
+                'patients': [patient.to_dict() for patient in patients],
+                'pagination': PatientService._build_pagination_metadata(page, per_page, total)
+            }
+            
+            return True, result
         except Exception as e:
             return False, f"Error searching patients: {str(e)}"
+    
+    @staticmethod
+    def _build_pagination_metadata(page, per_page, total):
+        """
+        Build pagination metadata
+        Args:
+            page: Current page number
+            per_page: Results per page
+            total: Total number of results
+        Returns: dict with pagination information
+        """
+        import math
+        pages = math.ceil(total / per_page) if per_page > 0 else 0
+        
+        return {
+            'page': page,
+            'per_page': per_page,
+            'total': total,
+            'pages': pages,
+            'has_next': page < pages,
+            'has_prev': page > 1
+        }
